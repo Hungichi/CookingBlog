@@ -7,7 +7,7 @@ exports.list = async (req, res, next) => {
     const filter = { status: 'published' };
     if (type) filter.type = type;
     if (featured === 'true') filter.featured = true;
-    if (categoryId) filter.categoryId = categoryId;
+    if (categoryId) filter.category = categoryId;
     if (search) {
       filter.$or = [
         { title: { $regex: search, $options: 'i' } },
@@ -16,8 +16,8 @@ exports.list = async (req, res, next) => {
     }
 
     let sortOption = { createdAt: -1 };
-    if (sort === 'popular') sortOption = { 'likes.length': -1, createdAt: -1 };
-    if (sort === 'rating') sortOption = { ratingSum: -1, createdAt: -1 };
+    if (sort === 'popular') sortOption = { likesCount: -1, createdAt: -1 };
+    if (sort === 'rating') sortOption = { ratingAvg: -1, createdAt: -1 };
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -26,21 +26,14 @@ exports.list = async (req, res, next) => {
         .sort(sortOption)
         .skip(skip)
         .limit(parseInt(limit))
-        .populate('userId', 'username avatar')
+        .populate('author', 'username avatar')
         .lean(),
       Post.countDocuments(filter),
     ]);
 
-    const data = posts.map((p) => ({
-      ...p,
-      author: p.userId,
-      userId: undefined,
-      rating: p.ratingCount > 0 ? Math.round((p.ratingSum / p.ratingCount) * 10) / 10 : 0,
-    }));
-
     res.json({
       success: true,
-      data,
+      data: posts,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -58,16 +51,10 @@ exports.featured = async (req, res, next) => {
     const posts = await Post.find({ status: 'published', featured: true })
       .sort({ createdAt: -1 })
       .limit(4)
-      .populate('userId', 'username avatar')
+      .populate('author', 'username avatar')
       .lean();
 
-    const data = posts.map((p) => ({
-      ...p,
-      author: p.userId,
-      userId: undefined,
-    }));
-
-    res.json({ success: true, data });
+    res.json({ success: true, data: posts });
   } catch (err) {
     next(err);
   }
