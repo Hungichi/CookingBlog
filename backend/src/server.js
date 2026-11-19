@@ -35,6 +35,7 @@ app.get('/api/health', (req, res) => res.json({ success: true, status: 'ok' }));
 
 app.use('/api/auth', authRoutes);
 
+
 // 404
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Không tìm thấy endpoint' });
