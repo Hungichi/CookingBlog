@@ -7,7 +7,6 @@ import { mockPosts } from "./mockPosts";
 
 const TABS = ["All", "Published", "Draft", "Archived"];
 
-// Màu cho StatusBadge (green / yellow / red / gray)
 const statusColor = { Published: "green", Draft: "yellow", Archived: "gray" };
 const typeColor = { Recipe: "red", Story: "gray" };
 
@@ -17,7 +16,6 @@ export default function PostManagement() {
 
   const filtered = tab === "All" ? posts : posts.filter((p) => p.status === tab);
 
-  // Ẩn bài = chuyển sang Archived; bấm lần nữa để hiện lại (Published)
   const toggleHidden = (id) => {
     setPosts((prev) =>
       prev.map((p) =>
@@ -34,7 +32,6 @@ export default function PostManagement() {
   };
 
   const viewPost = (id) => {
-    // TODO: chuyển tới trang chi tiết bài viết khi có route, ví dụ navigate(`/posts/${id}`)
     console.log("View post", id);
   };
 
