@@ -4,6 +4,8 @@ const {
   getMyProfile,
   getUserProfile,
   updateMyProfile,
+  followUser,
+  unfollowUser,
 } = require('../controllers/userController');
 
 const router = express.Router();
@@ -13,5 +15,7 @@ const router = express.Router();
 router.get('/me', protect, getMyProfile);
 router.put('/me', protect, updateMyProfile);
 router.get('/:id', getUserProfile);
+router.post('/:id/follow', protect, followUser);
+router.delete('/:id/follow', protect, unfollowUser);
 
 module.exports = router;

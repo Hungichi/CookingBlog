@@ -167,4 +167,79 @@ const updateMyProfile = async (req, res, next) => {
   }
 };
 
-module.exports = { getMyProfile, getUserProfile, updateMyProfile };
+// POST /api/users/:id/follow
+const followUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'ID người dùng không hợp lệ' });
+    }
+    if (id === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: 'Bạn không thể tự theo dõi chính mình' });
+    }
+
+    const target = await User.findById(id).select('_id');
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+    }
+
+    // $addToSet: đã follow rồi thì không thêm trùng
+    await Promise.all([
+      User.updateOne({ _id: req.user._id }, { $addToSet: { following: target._id } }),
+      User.updateOne({ _id: target._id }, { $addToSet: { followers: req.user._id } }),
+    ]);
+
+    const updatedTarget = await User.findById(target._id);
+    return res.status(200).json({
+      success: true,
+      message: 'Đã theo dõi',
+      data: {
+        id: updatedTarget._id,
+        followersCount: updatedTarget.followers.length,
+        isFollowing: true,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// DELETE /api/users/:id/follow
+const unfollowUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'ID người dùng không hợp lệ' });
+    }
+    if (id === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: 'Thao tác không hợp lệ' });
+    }
+
+    const target = await User.findById(id).select('_id');
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+    }
+
+    await Promise.all([
+      User.updateOne({ _id: req.user._id }, { $pull: { following: target._id } }),
+      User.updateOne({ _id: target._id }, { $pull: { followers: req.user._id } }),
+    ]);
+
+    const updatedTarget = await User.findById(target._id);
+    return res.status(200).json({
+      success: true,
+      message: 'Đã bỏ theo dõi',
+      data: {
+        id: updatedTarget._id,
+        followersCount: updatedTarget.followers.length,
+        isFollowing: false,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getMyProfile, getUserProfile, updateMyProfile, followUser, unfollowUser };
