@@ -6,6 +6,7 @@ const {
   updateMyProfile,
   followUser,
   unfollowUser,
+  deleteMyAccount,
 } = require('../controllers/userController');
 
 const router = express.Router();
@@ -17,5 +18,6 @@ router.put('/me', protect, updateMyProfile);
 router.get('/:id', getUserProfile);
 router.post('/:id/follow', protect, followUser);
 router.delete('/:id/follow', protect, unfollowUser);
+router.delete('/me', protect, deleteMyAccount);
 
 module.exports = router;

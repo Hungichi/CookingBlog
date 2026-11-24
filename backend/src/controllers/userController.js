@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const bcrypt = require('bcryptjs');
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_.]{3,30}$/;
 const BIO_MAX = 200;
@@ -242,4 +243,50 @@ const unfollowUser = async (req, res, next) => {
   }
 };
 
-module.exports = { getMyProfile, getUserProfile, updateMyProfile, followUser, unfollowUser };
+// DELETE /api/users/me
+const deleteMyAccount = async (req, res, next) => {
+  try {
+    const { password } = req.body || {};
+
+    if (typeof password !== 'string' || password.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập mật khẩu để xác nhận xóa tài khoản',
+      });
+    }
+
+    // req.user không có password (select: false) nên phải lấy lại
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
+    }
+
+    const id = user._id;
+
+    // Dọn id khỏi danh sách followers/following của người khác
+    await User.updateMany(
+      { $or: [{ followers: id }, { following: id }] },
+      { $pull: { followers: id, following: id } }
+    );
+
+    await User.deleteOne({ _id: id });
+
+    return res.status(200).json({ success: true, message: 'Đã xóa tài khoản' });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = {
+  getMyProfile,
+  getUserProfile,
+  updateMyProfile,
+  followUser,
+  unfollowUser,
+  deleteMyAccount,
+};
