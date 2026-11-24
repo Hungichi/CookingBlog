@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_.]{3,30}$/;
@@ -87,4 +88,59 @@ const register = async (req, res, next) => {
   }
 };
 
-module.exports = { register };
+//login
+const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body || {};
+
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập email và password',
+      });
+    }
+
+    // password co select: false nen ta phai .select('+password') 
+    const user = await User.findOne({ email: email.trim().toLowerCase() }).select('+password');
+
+    const invalidMsg = 'Email hoặc mật khẩu không đúng';
+    if (!user) {
+      return res.status(401).json({ success: false, message: invalidMsg });
+    }
+
+    //so khop password trong db va password user nhap
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: invalidMsg });
+    }
+
+    //tao token
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đăng nhập thành công',
+      data: {
+        token,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          avatar: user.avatar,
+          bio: user.bio,
+        },
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+//logout
+const logout = (req, res) => {
+  return res.status(200).json({ success: true, message: 'Đăng xuất thành công' });
+};
+
+module.exports = { register, login, logout };

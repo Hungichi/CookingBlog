@@ -1,0 +1,23 @@
+const express = require('express');
+const { protect } = require('../middlewares/authMiddleware');
+const {
+  getMyProfile,
+  getUserProfile,
+  updateMyProfile,
+  followUser,
+  unfollowUser,
+  deleteMyAccount,
+} = require('../controllers/userController');
+
+const router = express.Router();
+
+
+// '/me' phai dat truoc '/:id/ khong bi hieu la mot id
+router.get('/me', protect, getMyProfile);
+router.put('/me', protect, updateMyProfile);
+router.get('/:id', getUserProfile);
+router.post('/:id/follow', protect, followUser);
+router.delete('/:id/follow', protect, unfollowUser);
+router.delete('/me', protect, deleteMyAccount);
+
+module.exports = router;

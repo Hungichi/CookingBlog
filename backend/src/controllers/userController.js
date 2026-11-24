@@ -1,0 +1,292 @@
+const mongoose = require('mongoose');
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+
+const USERNAME_REGEX = /^[a-zA-Z0-9_.]{3,30}$/;
+const BIO_MAX = 200;
+
+
+//chi nhan link https or https va toi da 500 ky tu. Khong nhan chuoi rong va xoa AVT neu rong
+const isValidUrl = (value) => {
+  if (value === '') return true;
+  if (value.length > 500) return false;
+  try {
+    const u = new URL(value);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+
+//Profile cua chinh minh (co email)
+const formatPrivateProfile = (user) => ({
+  id: user._id,
+  username: user.username,
+  email: user.email,
+  avatar: user.avatar,
+  bio: user.bio,
+  followersCount: user.followers.length,
+  followingCount: user.following.length,
+  createdAt: user.createdAt,
+});
+
+
+//Ho so cong khai (khong co email)
+const formatPublicProfile = (user) => ({
+  id: user._id,
+  username: user.username,
+  avatar: user.avatar,
+  bio: user.bio,
+  followersCount: user.followers.length,
+  followingCount: user.following.length,
+  createdAt: user.createdAt,
+});
+
+// GET /api/users/me
+const getMyProfile = async (req, res, next) => {
+  try {
+    // req.user do middleware protect gan
+    return res.status(200).json({
+      success: true,
+      data: formatPrivateProfile(req.user),
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// GET /api/users/:id
+const getUserProfile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'ID người dùng không hợp lệ' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: formatPublicProfile(user),
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// PUT /api/users/me
+const updateMyProfile = async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const updates = {};
+
+
+    //Whilelist: chi xu ly dung 3 truong nay, cac truong khac bo qua
+    if (body.username !== undefined) {
+      if (typeof body.username !== 'string') {
+        return res.status(400).json({ success: false, message: 'Username không hợp lệ' });
+      }
+      const username = body.username.trim();
+      if (!USERNAME_REGEX.test(username)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Username dài 3-30 ký tự, chỉ gồm chữ, số, dấu _ và .',
+        });
+      }
+      updates.username = username;
+    }
+
+    if (body.bio !== undefined) {
+      if (typeof body.bio !== 'string') {
+        return res.status(400).json({ success: false, message: 'Bio không hợp lệ' });
+      }
+      const bio = body.bio.trim();
+      if (bio.length > BIO_MAX) {
+        return res.status(400).json({
+          success: false,
+          message: `Bio tối đa ${BIO_MAX} ký tự`,
+        });
+      }
+      updates.bio = bio;
+    }
+
+    if (body.avatar !== undefined) {
+      if (typeof body.avatar !== 'string') {
+        return res.status(400).json({ success: false, message: 'Avatar không hợp lệ' });
+      }
+      const avatar = body.avatar.trim();
+      if (!isValidUrl(avatar)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Avatar phải là đường link http/https hợp lệ (tối đa 500 ký tự)',
+        });
+      }
+      updates.avatar = avatar;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không có trường hợp lệ để cập nhật (username, bio, avatar)',
+      });
+    }
+
+    //Doi username thi kiem tra trung voi nguoi khac
+    if (updates.username && updates.username !== req.user.username) {
+      const existed = await User.findOne({
+        username: updates.username,
+        _id: { $ne: req.user._id },
+      }).lean();
+      if (existed) {
+        return res.status(409).json({ success: false, message: 'Username đã được sử dụng' });
+      }
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Cập nhật hồ sơ thành công',
+      data: formatPrivateProfile(user),
+    });
+  } catch (err) {
+
+    //unique index chan neu 2 nguoi cung doi sang 1 username
+    if (err.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Username đã được sử dụng' });
+    }
+    return next(err);
+  }
+};
+
+// POST /api/users/:id/follow
+const followUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'ID người dùng không hợp lệ' });
+    }
+    if (id === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: 'Bạn không thể tự theo dõi chính mình' });
+    }
+
+    const target = await User.findById(id).select('_id');
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+    }
+
+    // $addToSet: đã follow rồi thì không thêm trùng
+    await Promise.all([
+      User.updateOne({ _id: req.user._id }, { $addToSet: { following: target._id } }),
+      User.updateOne({ _id: target._id }, { $addToSet: { followers: req.user._id } }),
+    ]);
+
+    const updatedTarget = await User.findById(target._id);
+    return res.status(200).json({
+      success: true,
+      message: 'Đã theo dõi',
+      data: {
+        id: updatedTarget._id,
+        followersCount: updatedTarget.followers.length,
+        isFollowing: true,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// DELETE /api/users/:id/follow
+const unfollowUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'ID người dùng không hợp lệ' });
+    }
+    if (id === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: 'Thao tác không hợp lệ' });
+    }
+
+    const target = await User.findById(id).select('_id');
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+    }
+
+    await Promise.all([
+      User.updateOne({ _id: req.user._id }, { $pull: { following: target._id } }),
+      User.updateOne({ _id: target._id }, { $pull: { followers: req.user._id } }),
+    ]);
+
+    const updatedTarget = await User.findById(target._id);
+    return res.status(200).json({
+      success: true,
+      message: 'Đã bỏ theo dõi',
+      data: {
+        id: updatedTarget._id,
+        followersCount: updatedTarget.followers.length,
+        isFollowing: false,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// DELETE /api/users/me
+const deleteMyAccount = async (req, res, next) => {
+  try {
+    const { password } = req.body || {};
+
+    if (typeof password !== 'string' || password.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập mật khẩu để xác nhận xóa tài khoản',
+      });
+    }
+
+    // req.user không có password (select: false) nên phải lấy lại
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Mật khẩu không đúng' });
+    }
+
+    const id = user._id;
+
+    // Dọn id khỏi danh sách followers/following của người khác
+    await User.updateMany(
+      { $or: [{ followers: id }, { following: id }] },
+      { $pull: { followers: id, following: id } }
+    );
+
+    await User.deleteOne({ _id: id });
+
+    return res.status(200).json({ success: true, message: 'Đã xóa tài khoản' });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = {
+  getMyProfile,
+  getUserProfile,
+  updateMyProfile,
+  followUser,
+  unfollowUser,
+  deleteMyAccount,
+};
