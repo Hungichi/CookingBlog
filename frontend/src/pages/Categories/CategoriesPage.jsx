@@ -3,21 +3,23 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
 import RecipeCard from '../../components/common/RecipeCard';
 
+const BG_COLORS = ['bg-amber-50', 'bg-orange-50', 'bg-yellow-50', 'bg-green-50', 'bg-rose-50', 'bg-blue-50', 'bg-purple-50', 'bg-teal-50'];
+
 const PLACEHOLDER_CATEGORIES = [
-  { _id: '1', name: 'Món Việt', description: 'Các món ăn truyền thống Việt Nam', imageUrl: '' },
-  { _id: '2', name: 'Món Á', description: 'Ẩm thực châu Á phong phú', imageUrl: '' },
-  { _id: '3', name: 'Món Âu', description: 'Hương vị phương Tây', imageUrl: '' },
-  { _id: '4', name: 'Tráng miệng', description: 'Bánh ngọt và đồ tráng miệng', imageUrl: '' },
-  { _id: '5', name: 'Đồ uống', description: 'Nước ép, sinh tố và cocktail', imageUrl: '' },
-  { _id: '6', name: 'Ăn chay', description: 'Món chay dinh dưỡng', imageUrl: '' },
-  { _id: '7', name: 'Healthy', description: 'Món ăn lành mạnh', imageUrl: '' },
-  { _id: '8', name: 'Ăn vặt', description: 'Snack và món ăn vặt', imageUrl: '' },
+  { _id: '1', name: 'Breakfast', description: 'Start your day right', imageUrl: 'https://images.unsplash.com/photo-1598976711774-205feb755bb7?w=400', count: 128 },
+  { _id: '2', name: 'Lunch & Dinner', description: 'Hearty main courses', imageUrl: 'https://images.unsplash.com/photo-1607403218119-83b4df4c0959?w=400', count: 342 },
+  { _id: '3', name: 'Desserts', description: 'Sweet treats', imageUrl: 'https://images.unsplash.com/photo-1705301698836-82acd5a5cb38?w=400', count: 215 },
+  { _id: '4', name: 'Drinks', description: 'Refreshing beverages', imageUrl: 'https://images.unsplash.com/photo-1576505944072-9d22786cb600?w=400', count: 96 },
+  { _id: '5', name: 'Healthy Food', description: 'Nutritious and delicious', imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400', count: 187 },
+  { _id: '6', name: 'Asian Cuisine', description: 'Flavors from the East', imageUrl: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400', count: 264 },
+  { _id: '7', name: 'Italian', description: 'Classic Mediterranean', imageUrl: 'https://images.unsplash.com/photo-1598866594230-a7c12756260f?w=400', count: 198 },
+  { _id: '8', name: 'Quick Meals', description: 'Ready in 30 minutes', imageUrl: 'https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?w=400', count: 156 },
 ];
 
 const PLACEHOLDER_POSTS = [
-  { _id: '1', title: 'Phở Bò Hà Nội', description: 'Công thức phở bò truyền thống', cookTime: 120, rating: 4.8, coverImage: '', author: { username: 'Chef Minh', avatar: '' } },
-  { _id: '2', title: 'Bún Bò Huế', description: 'Bún bò cay nồng đặc trưng Huế', cookTime: 90, rating: 4.7, coverImage: '', author: { username: 'Foodie Mai', avatar: '' } },
-  { _id: '3', title: 'Bánh Xèo', description: 'Bánh xèo giòn rụm miền Tây', cookTime: 40, rating: 4.5, coverImage: '', author: { username: 'Chef Hùng', avatar: '' } },
+  { _id: '1', title: 'Lemon Herb Salmon', description: 'Fresh salmon with herbs', cookTime: 25, ratingAvg: 4.8, coverImage: 'https://images.unsplash.com/photo-1673436977947-0787164a9abc?w=400', author: { username: 'Emma Wilson', avatar: '' } },
+  { _id: '2', title: 'Mushroom Risotto', description: 'Creamy Italian risotto', cookTime: 40, ratingAvg: 4.7, coverImage: 'https://images.unsplash.com/photo-1690195127088-4c33687723b5?w=400', author: { username: 'Marco Rossi', avatar: '' } },
+  { _id: '3', title: 'Açaí Bowl', description: 'Refreshing açaí bowl', cookTime: 10, ratingAvg: 4.9, coverImage: 'https://images.unsplash.com/photo-1640126219893-6c869dbe9bd0?w=400', author: { username: 'Mia Santos', avatar: '' } },
 ];
 
 function CategoryList() {
@@ -35,50 +37,54 @@ function CategoryList() {
 
   return (
     <div className="min-h-screen bg-cream">
-      <div className="bg-secondary text-white py-12 sm:py-16">
-        <div className="max-w-6xl mx-auto px-4 text-center">
-          <h1 className="font-heading text-3xl sm:text-4xl font-bold">Danh mục</h1>
-          <p className="text-cream-dark mt-3 max-w-xl mx-auto">
-            Khám phá công thức theo từng danh mục yêu thích
+      {/* Header - cream gradient */}
+      <div className="py-12" style={{ background: 'linear-gradient(180deg, #F0E8D8 0%, #F7F2E8 100%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-12 text-center">
+          <h1 className="font-heading text-3xl sm:text-[40px] font-bold text-gray-900">
+            Food Categories
+          </h1>
+          <p className="text-gray-500 mt-3 text-base">
+            Browse recipes by your favorite food categories
           </p>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-10">
+      {/* Category Grid */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-12 py-10">
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="animate-pulse bg-white rounded-2xl overflow-hidden shadow-sm">
-                <div className="aspect-[4/3] bg-cream-dark" />
+              <div key={i} className="animate-pulse rounded-xl overflow-hidden bg-white">
+                <div className="h-40 bg-cream-dark" />
                 <div className="p-4 space-y-2">
-                  <div className="h-4 bg-cream-dark rounded w-2/3" />
-                  <div className="h-3 bg-cream-dark rounded w-full" />
+                  <div className="h-5 bg-cream-dark rounded w-2/3" />
+                  <div className="h-3 bg-cream-dark rounded w-1/3" />
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
-            {list.map((cat) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {list.map((cat, i) => (
               <Link
                 key={cat._id}
                 to={`/categories/${cat._id}`}
-                className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                className={`group rounded-xl overflow-hidden hover:shadow-md transition-shadow ${BG_COLORS[i % BG_COLORS.length]}`}
               >
-                <div className="aspect-[4/3] overflow-hidden bg-cream-dark">
+                <div className="h-40 overflow-hidden">
                   <img
                     src={cat.imageUrl || `https://placehold.co/400x300/F0EBE3/B85C38?text=${encodeURIComponent(cat.name)}`}
                     alt={cat.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                <div className="px-4 py-3">
+                  <h3 className="font-heading text-lg font-semibold text-gray-900 group-hover:text-primary transition-colors">
                     {cat.name}
                   </h3>
-                  {cat.description && (
-                    <p className="text-sm text-gray-500 mt-1 line-clamp-2">{cat.description}</p>
-                  )}
+                  <p className="text-xs text-gray-400 mt-1">
+                    {cat.count || '0'} recipes
+                  </p>
                 </div>
               </Link>
             ))}
@@ -104,10 +110,10 @@ function CategoryDetail() {
           api.get('/posts', { params: { categoryId: id, limit: 20 } }),
         ]);
         const found = (catRes.data.data || []).find((c) => c._id === id);
-        setCategory(found || { name: 'Danh mục', description: '' });
+        setCategory(found || { name: 'Category', description: '' });
         setPosts(postsRes.data.data || []);
       } catch {
-        setCategory({ name: 'Danh mục', description: '' });
+        setCategory({ name: 'Category', description: '' });
         setPosts(PLACEHOLDER_POSTS);
       } finally {
         setLoading(false);
@@ -118,24 +124,24 @@ function CategoryDetail() {
 
   return (
     <div className="min-h-screen bg-cream">
-      <div className="bg-secondary text-white py-12 sm:py-16">
-        <div className="max-w-6xl mx-auto px-4 text-center">
-          <Link to="/categories" className="text-cream-dark hover:text-white text-sm transition-colors">
-            ← Tất cả danh mục
+      <div className="py-12" style={{ background: 'linear-gradient(180deg, #F0E8D8 0%, #F7F2E8 100%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-12 text-center">
+          <Link to="/categories" className="text-gray-400 hover:text-gray-600 text-sm transition-colors">
+            ← All Categories
           </Link>
-          <h1 className="font-heading text-3xl sm:text-4xl font-bold mt-3">
-            {category?.name || 'Đang tải...'}
+          <h1 className="font-heading text-3xl sm:text-[40px] font-bold text-gray-900 mt-3">
+            {category?.name || '...'}
           </h1>
           {category?.description && (
-            <p className="text-cream-dark mt-3 max-w-xl mx-auto">{category.description}</p>
+            <p className="text-gray-500 mt-3 text-base">{category.description}</p>
           )}
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-12 py-10">
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="bg-white rounded-xl overflow-hidden shadow-sm animate-pulse">
                 <div className="aspect-[4/3] bg-cream-dark" />
                 <div className="p-4 space-y-3">
@@ -147,13 +153,13 @@ function CategoryDetail() {
           </div>
         ) : posts.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-gray-400 text-lg">Chưa có bài viết nào trong danh mục này</p>
+            <p className="text-gray-400 text-lg">No recipes in this category yet</p>
             <Link to="/explore" className="mt-4 inline-block text-primary hover:underline text-sm">
-              Khám phá tất cả
+              Explore all recipes
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {posts.map((post) => (
               <RecipeCard key={post._id} recipe={post} />
             ))}
