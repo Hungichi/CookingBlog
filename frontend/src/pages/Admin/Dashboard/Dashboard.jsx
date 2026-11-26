@@ -1,4 +1,4 @@
-import { FiUsers, FiFileText, FiCheckCircle, FiFlag } from "react-icons/fi";
+import { FiUsers, FiFileText, FiCheckCircle, FiFlag, FiBell } from "react-icons/fi";
 import StatCard from "../../../components/admin/StatCard";
 import { mockStats, mockActivities } from "./mockDashboard";
 
@@ -12,7 +12,17 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <div className="flex items-center gap-4">
+          <button type="button" title="Thông báo" className="text-gray-600 hover:text-gray-900">
+            <FiBell size={20} />
+          </button>
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
+            A
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c) => (
