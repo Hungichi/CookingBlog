@@ -12,10 +12,9 @@ const protect = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
-    //kiem tra user con ton tai hay khong (khong cho tai khoan cu dung duoc nua)
-    const user = await User.findById(decoded.id);
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'Tài khoản không tồn tại' });
+    const user = await User.findById(decoded.id).select('+tokenVersion');
+    if (!user || user.tokenVersion !== decoded.tv) {
+      return res.status(401).json({ success: false, message: 'Phiên đăng nhập không còn hiệu lực' });
     }
 
     req.user = user; 

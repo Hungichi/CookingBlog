@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const sendEmail = require('../utils/sendEmail');
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_.]{3,30}$/;
@@ -101,7 +103,8 @@ const login = async (req, res, next) => {
     }
 
     // password co select: false nen ta phai .select('+password') 
-    const user = await User.findOne({ email: email.trim().toLowerCase() }).select('+password');
+    // lấy thêm tokenVersion
+    const user = await User.findOne({ email: email.trim().toLowerCase() }).select('+password +tokenVersion');
 
     const invalidMsg = 'Email hoặc mật khẩu không đúng';
     if (!user) {
@@ -115,7 +118,7 @@ const login = async (req, res, next) => {
     }
 
     //tao token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ id: user._id, tv: user.tokenVersion }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     });
 
@@ -139,8 +142,128 @@ const login = async (req, res, next) => {
 };
 
 //logout
-const logout = (req, res) => {
-  return res.status(200).json({ success: true, message: 'Đăng xuất thành công' });
+const logout = async (req, res, next) => {
+  try {
+    await User.updateOne({ _id: req.user._id }, { $inc: { tokenVersion: 1 } });
+    return res.status(200).json({ success: true, message: 'Đăng xuất thành công' });
+  } 
+  catch (err) {
+    return next(err);
+  }
 };
 
-module.exports = { register, login, logout };
+
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+// POST /api/auth/forgot-password
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body || {};
+
+    if (typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
+      return res.status(400).json({ success: false, message: 'Email không hợp lệ' });
+    }
+
+    // Luôn trả cùng một thông báo để không lộ email nào đã đăng ký
+    const genericResponse = {
+      success: true,
+      message: 'Nếu email tồn tại, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu',
+    };
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) {
+      return res.status(200).json(genericResponse);
+    }
+
+    
+    //Token goc chi gui qua email, DB chi luu ban hash
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    await User.updateOne(
+      { _id: user._id },
+      {
+        resetPasswordToken: hashToken(rawToken),
+        resetPasswordExpires: new Date(Date.now() + 15 * 60 * 1000),
+      }
+    );
+
+
+    //CLIENT_URL co the chua nhieu domain, ta lay domain dau tien
+    const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
+    const resetLink = `${clientUrl}/reset-password?token=${rawToken}`;
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'CookingBlog - Đặt lại mật khẩu',
+        html: `
+          <p>Xin chào ${user.username},</p>
+          <p>Bạn vừa yêu cầu đặt lại mật khẩu. Bấm vào link bên dưới (có hiệu lực trong 15 phút):</p>
+          <p><a href="${resetLink}">Đặt lại mật khẩu</a></p>
+          <p>Nếu không phải bạn yêu cầu, hãy bỏ qua email này.</p>
+        `,
+      });
+    } catch (mailErr) {
+
+      //Gui mail loi thi xoa toekn de khong ton tai token vo chu
+      await User.updateOne(
+        { _id: user._id },
+        { $unset: { resetPasswordToken: 1, resetPasswordExpires: 1 } }
+      );
+      console.error('Send email error:', mailErr.message);
+      return res.status(500).json({ success: false, message: 'Không gửi được email, thử lại sau' });
+    }
+
+    return res.status(200).json(genericResponse);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// POST /api/auth/reset-password   body: { token, password }
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body || {};
+
+    if (typeof token !== 'string' || typeof password !== 'string' || !token) {
+      return res.status(400).json({ success: false, message: 'Thiếu token hoặc mật khẩu mới' });
+    }
+    if (password.length < 6 || password.length > 72) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mật khẩu phải từ 6 đến 72 ký tự',
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    //Kiem tra token, vua doi mat khau, vua xoa token
+    //Token chi dung duoc mot lan, ke ca khi 2 request gui cung luc
+    const user = await User.findOneAndUpdate(
+      {
+        resetPasswordToken: hashToken(token),
+        resetPasswordExpires: { $gt: new Date() },
+      },
+      {
+        $set: { password: hashedPassword },
+        $unset: { resetPasswordToken: 1, resetPasswordExpires: 1 },
+        $inc: { tokenVersion: 1 }, // //vo hieu hoa token cu
+      }
+    );
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token không hợp lệ hoặc đã hết hạn',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đặt lại mật khẩu thành công, vui lòng đăng nhập lại',
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { register, login, logout, forgotPassword, resetPassword };
